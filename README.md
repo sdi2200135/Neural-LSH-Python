@@ -19,6 +19,10 @@ This assignment extends the work from [Assignment 1](../https://github.com/sdi22
 were implemented in C++. The same datasets (MNIST, SIFT) and evaluation metrics (QPS, Recall, AF) are used,
 enabling direct performance comparison across all five algorithms.
 
+🌐 **[View the interactive presentation](https://sdi2200135.github.io/Neural-LSH-Python/)**
+
+[![Website](https://img.shields.io/badge/Website-Live-brightgreen)](https://sdi2200135.github.io/Neural-LSH-Python/)
+
 ---
 
 ## Team
