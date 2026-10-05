@@ -1,0 +1,1304 @@
+<!-- site for the explanation of the project -->
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural LSH — Approximate Nearest Neighbor Search</title>
+<style>
+:root {
+  --bg: #0f172a;
+  --bg-card: #1e293b;
+  --bg-soft: #334155;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #a78bfa;
+  --accent-2: #38bdf8;
+  --success: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --build: #38bdf8;
+  --search: #a78bfa;
+  --nn: #34d399;
+  --border: #334155;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+nav {
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 0 1.5rem;
+}
+
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo::before { content: "🧠"; font-size: 1.2rem; }
+
+.nav-links {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  list-style: none;
+}
+
+.nav-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.nav-links a:hover { color: var(--text); background: var(--bg-soft); }
+.nav-links a.active { color: var(--bg); background: var(--accent); }
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.page { display: none; animation: fadeIn 0.4s ease; }
+.page.active { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hero {
+  text-align: center;
+  padding: 2rem 0 3rem;
+}
+
+.hero h1 {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  color: var(--text-muted);
+  max-width: 720px;
+  margin: 0 auto 1.5rem;
+  font-size: 1.05rem;
+}
+
+.badges {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.badge {
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.badge.py { color: var(--accent-2); border-color: var(--accent-2); }
+.badge.torch { color: #f87171; border-color: #f87171; }
+.badge.kahip { color: #34d399; border-color: #34d399; }
+.badge.data { color: var(--warn); border-color: var(--warn); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  transition: all 0.25s;
+}
+
+.card:hover { transform: translateY(-3px); border-color: var(--accent); }
+
+.card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.6rem;
+  color: var(--text);
+}
+
+.card p { color: var(--text-muted); font-size: 0.92rem; }
+
+.phase-card { cursor: pointer; position: relative; overflow: hidden; }
+.phase-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--build);
+}
+.phase-card.search::before { background: var(--search); }
+
+.phase-card h3 { display: flex; align-items: center; gap: 0.5rem; }
+.phase-card .tag {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.tag.build { background: rgba(56,189,248,0.15); color: var(--build); }
+.tag.search { background: rgba(167,139,250,0.15); color: var(--search); }
+
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.section h2 {
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--text);
+}
+
+.section h2 .num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: var(--accent);
+  color: var(--bg);
+  flex-shrink: 0;
+}
+
+.section h3 {
+  font-size: 1rem;
+  margin: 1.2rem 0 0.6rem;
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+.phase-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.phase-header .icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.phase-header.build .icon { background: rgba(56,189,248,0.15); color: var(--build); }
+.phase-header.search .icon { background: rgba(167,139,250,0.15); color: var(--search); }
+
+.phase-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.phase-header p { color: var(--text-muted); font-size: 0.95rem; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+th, td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  background: var(--bg-soft);
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(167, 139, 250, 0.04); }
+
+td code, p code, li code, .step code {
+  background: var(--bg-soft);
+  padding: 0.15rem 0.45rem;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.85em;
+  color: var(--accent-2);
+  border: 1px solid var(--border);
+}
+
+.step-list {
+  list-style: none;
+  counter-reset: step;
+  padding-left: 0;
+}
+
+.step-list li {
+  counter-increment: step;
+  position: relative;
+  padding: 0.8rem 0 0.8rem 3rem;
+  border-left: 2px solid var(--border);
+  margin-left: 1rem;
+}
+
+.step-list li::before {
+  content: counter(step);
+  position: absolute;
+  left: -1.05rem;
+  top: 0.8rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: 3px solid var(--bg-card);
+}
+
+.step-list li:last-child { border-left-color: transparent; }
+
+.step-list li strong { color: var(--text); }
+.step-list li span { color: var(--text-muted); font-size: 0.92rem; display: block; margin-top: 0.15rem; }
+
+pre {
+  background: #0a0f1e;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin: 0.75rem 0;
+}
+
+pre .kw { color: #c084fc; }
+pre .cm { color: #64748b; font-style: italic; }
+pre .str { color: #86efac; }
+pre .num { color: #fbbf24; }
+pre .fn { color: #60a5fa; }
+
+.result-box {
+  background: linear-gradient(135deg, rgba(167,139,250,0.08), rgba(56,189,248,0.08));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin: 0.75rem 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.exp-table-wrap { overflow-x: auto; margin: 1rem 0; }
+.exp-table {
+  min-width: 700px;
+  background: var(--bg-soft);
+}
+.exp-table th { background: #0a0f1e; }
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  height: 220px;
+  padding: 1rem 0;
+  margin: 1rem 0;
+  border-bottom: 2px solid var(--border);
+}
+
+.chart-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+}
+
+.chart-bar .bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.3s;
+}
+
+.chart-bar .bar:hover { filter: brightness(1.2); }
+.chart-bar .label {
+  position: absolute;
+  bottom: -28px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.chart-bar .value {
+  position: absolute;
+  top: -22px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bar.blue { background: linear-gradient(180deg, #60a5fa, #3b82f6); }
+.bar.green { background: linear-gradient(180deg, #34d399, #10b981); }
+.bar.amber { background: linear-gradient(180deg, #fbbf24, #f59e0b); }
+.bar.red { background: linear-gradient(180deg, #f87171, #ef4444); }
+.bar.purple { background: linear-gradient(180deg, #a78bfa, #8b5cf6); }
+
+.alert {
+  padding: 1rem 1.2rem;
+  border-radius: 10px;
+  margin: 0.75rem 0;
+  border-left: 4px solid;
+  font-size: 0.92rem;
+}
+
+.alert.info { background: rgba(56,189,248,0.08); border-color: var(--accent-2); }
+.alert.success { background: rgba(52,211,153,0.08); border-color: var(--success); }
+.alert.warn { background: rgba(251,191,36,0.08); border-color: var(--warn); }
+.alert.danger { background: rgba(248,113,113,0.08); border-color: var(--danger); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.stat {
+  background: var(--bg-soft);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.stat .value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  display: block;
+  line-height: 1.2;
+}
+
+.stat .name {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #0a0f1e;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.pipeline-step {
+  padding: 0.5rem 0.9rem;
+  background: var(--bg-soft);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.pipeline-arrow { color: var(--accent); font-weight: 700; }
+
+footer {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+}
+
+@media (max-width: 640px) {
+  .nav-inner { height: auto; padding: 0.75rem 0; }
+  .nav-links { width: 100%; justify-content: center; }
+  .nav-links a { padding: 0.4rem 0.7rem; font-size: 0.82rem; }
+  .section { padding: 1.25rem; }
+  .phase-header h1 { font-size: 1.3rem; }
+  .pipeline { flex-direction: column; align-items: stretch; }
+  .pipeline-arrow { transform: rotate(90deg); text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="logo" onclick="go('home')">Neural LSH</div>
+    <ul class="nav-links">
+      <li><a data-page="home" onclick="go('home')">Αρχική</a></li>
+      <li><a data-page="build" onclick="go('build')">Build Phase</a></li>
+      <li><a data-page="search" onclick="go('search')">Search Phase</a></li>
+      <li><a data-page="study" onclick="go('study')">Πειραματική Μελέτη</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+
+<!-- ==================== HOME ==================== -->
+<section class="page active" id="home">
+  <div class="hero">
+    <h1>Neural LSH</h1>
+    <p>
+      Learned Approximate Nearest Neighbor search — αντικαθιστώντας τις κλασικές hash 
+      functions με ένα εκπαιδευμένο νευρωνικό δίκτυο.
+    </p>
+    <div class="badges">
+      <span class="badge py">Python 3.8+</span>
+      <span class="badge torch">PyTorch</span>
+      <span class="badge kahip">KaHIP</span>
+      <span class="badge data">MNIST · SIFT</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📖 Σχετικά με την Εργασία</h2>
+    <p>
+      Η παρούσα εργασία αποτελεί τη <strong>2η Προγραμματιστική Εργασία</strong> 
+      του μαθήματος <em>«Ανάπτυξη Λογισμικού για Αλγοριθμικά Προβλήματα»</em>. 
+      Υλοποιεί τον αλγόριθμο <strong>Neural LSH</strong> — μια <em>learned</em> 
+      εκδοχή του κλασικού LSH, όπου οι hash functions αντικαθίστανται από ένα 
+      MLP classifier που έχει εκπαιδευτεί να προβλέπει το partition label κάθε 
+      διανύσματος.
+    </p>
+    <p style="color:var(--text-muted); margin-top:0.75rem;">
+      Η εργασία επεκτείνει την 1η εργασία (LSH, Hypercube, IVFFlat, IVFPQ σε C++) 
+      χρησιμοποιώντας τα <strong>ίδια datasets</strong> (MNIST, SIFT) και τις 
+      <strong>ίδιες μετρικές</strong> (QPS, Recall, AF) για άμεση σύγκριση.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>🔀 Πώς Λειτουργεί</h2>
+    <p style="color:var(--text-muted); margin-bottom:1rem;">
+      Ο αλγόριθμος λειτουργεί σε <strong>δύο φάσεις</strong>:
+    </p>
+
+    <h3>Build Phase — nlsh_build2.py</h3>
+    <div class="pipeline">
+      <span class="pipeline-step">k-NN Graph</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">Symmetric Graph</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">KaHIP Partition</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">MLP Training</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">Save Index</span>
+    </div>
+
+    <h3>Search Phase — nlsh_search2.py</h3>
+    <div class="pipeline">
+      <span class="pipeline-step">Load Index</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">MLP Inference</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">Top-T Bins</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">Multi-Probe</span>
+      <span class="pipeline-arrow">→</span>
+      <span class="pipeline-step">Top-N</span>
+    </div>
+
+    <div class="grid">
+      <div class="card phase-card" onclick="go('build')">
+        <h3>🏗️ Build Phase <span class="tag build">index</span></h3>
+        <p>Κατασκευή k-NN graph, graph partitioning με KaHIP, 
+        εκπαίδευση MLP classifier και αποθήκευση index.</p>
+      </div>
+      <div class="card phase-card search" onclick="go('search')">
+        <h3>🔍 Search Phase <span class="tag search">query</span></h3>
+        <p>Φόρτωση του index, MLP inference, multi-probe στα top-T bins 
+        και υπολογισμός μετρικών.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🛠️ Τεχνολογίες</h2>
+    <div class="grid">
+      <div class="card"><h3>PyTorch</h3><p>MLP classifier, εκπαίδευση με CrossEntropyLoss και Adam optimizer.</p></div>
+      <div class="card"><h3>KaHIP</h3><p>Balanced graph partitioning με τη βιβλιοθήκη <code>kaffpa</code>.</p></div>
+      <div class="card"><h3>NetworkX</h3><p>Διαχείριση και έλεγχος συνέπειας του k-NN γράφου.</p></div>
+      <div class="card"><h3>NumPy / SciPy</h3><p>Αριθμητικές πράξεις, φόρτωση datasets, exact search.</p></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>👥 Ομάδα</h2>
+    <table>
+      <thead><tr><th>Ονοματεπώνυμο</th><th>Α.Μ.</th></tr></thead>
+      <tbody>
+        <tr><td>Παπαθανασίου Ελένη</td><td>1115202200135</td></tr>
+        <tr><td>Τόντου Αλτάνη-Δάφνη</td><td>1115202200288</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ==================== BUILD PHASE ==================== -->
+<section class="page" id="build">
+  <div class="phase-header build">
+    <div class="icon">🏗️</div>
+    <div>
+      <h1>Build Phase</h1>
+      <p>Κατασκευή του index — <code>nlsh_build2.py</code></p>
+    </div>
+  </div>
+
+  <!-- 1. INPUT -->
+  <div class="section">
+    <h2><span class="num">1</span> Input</h2>
+    <p>Το build δέχεται το dataset και τις παραμέτρους για k-NN graph, partitioning και MLP training.</p>
+
+    <table>
+      <thead>
+        <tr><th>Παράμετρος</th><th>Περιγραφή</th><th>Default</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>-d</code></td><td>Dataset (SIFT fvecs ή MNIST idx3)</td><td>—</td></tr>
+        <tr><td><code>-i</code></td><td>Φάκελος αποθήκευσης index</td><td>—</td></tr>
+        <tr><td><code>-type</code></td><td>"sift" ή "mnist"</td><td>—</td></tr>
+        <tr><td><code>--knn</code></td><td>Αριθμός γειτόνων για k-NN graph</td><td>10</td></tr>
+        <tr><td><code>-m</code></td><td>Αριθμός partitions KaHIP & MLP output</td><td>100</td></tr>
+        <tr><td><code>--imbalance</code></td><td>Επιτρεπτή ανισορροπία partitions</td><td>0.03</td></tr>
+        <tr><td><code>--kahip_mode</code></td><td>KaHIP mode (2 = STRONG)</td><td>2</td></tr>
+        <tr><td><code>--layers</code></td><td>Αριθμός κρυφών layers MLP</td><td>3</td></tr>
+        <tr><td><code>--nodes</code></td><td>Νευρώνες ανά hidden layer</td><td>64</td></tr>
+        <tr><td><code>--epochs</code></td><td>Εποχές εκπαίδευσης</td><td>10</td></tr>
+        <tr><td><code>--batch_size</code></td><td>Μέγεθος batch</td><td>128</td></tr>
+        <tr><td><code>--lr</code></td><td>Learning rate</td><td>0.001</td></tr>
+        <tr><td><code>--seed</code></td><td>Seed αναπαραγωγιμότητας</td><td>1</td></tr>
+        <tr><td><code>--knn_method</code></td><td>"bruteforce" ή "ivfflat"</td><td>bruteforce</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Βήματα φόρτωσης</h3>
+    <ol class="step-list">
+      <li><strong>Parse argv</strong><span>Χρήση <code>argparse</code> για όλα τα flags.</span></li>
+      <li><strong>Set seeds</strong><span><code>torch.manual_seed(seed)</code> και <code>np.random.seed(seed)</code>.</span></li>
+      <li><strong>Redirect output</strong><span><code>OutputLogger</code> ανακατευθύνει το stdout στο <code>nlsh_build_output.txt</code>.</span></li>
+      <li><strong>Φόρτωση dataset</strong><span>Κλήση <code>load_dataset(dataset, type)</code> — <code>load_fvecs</code> για SIFT ή <code>load_mnist</code> για MNIST.</span></li>
+    </ol>
+  </div>
+
+  <!-- 2. BUILD -->
+  <div class="section">
+    <h2><span class="num">2</span> Build Phase — Πώς χτίζεται το index</h2>
+
+    <h3>Βήμα 1: k-NN Graph Construction</h3>
+    <ol class="step-list">
+      <li><strong>build_knn_graph(args, method)</strong><span>Κλήση του C++ binary μέσω <code>subprocess.run</code>. Αν <code>method="bruteforce"</code> → <code>-bruteforce_knn</code>. Αν <code>"ivfflat"</code> → <code>-ivfflat_knn -kclusters 100 -nprobe 5</code>.</span></li>
+      <li><strong>Παραγωγή knn_output.txt</strong><span>Κάθε γραμμή: <code>node: neighbor1 neighbor2 ...</code></span></li>
+      <li><strong>read_knn_graph</strong><span>Parse του αρχείου → dict <code>{node: [neighbors]}</code>.</span></li>
+    </ol>
+
+    <h3>Βήμα 2: Symmetric Weighted Graph</h3>
+    <ol class="step-list">
+      <li><strong>Αφαίρεση self-loops & duplicates</strong><span><code>[nb for nb in graph[u] if nb != u]</code>.</span></li>
+      <li><strong>Μέτρημα εμφανίσεων κάθε ακμής</strong><span><code>edge_weights[tuple(sorted((u, v)))] += 1</code>.</span></li>
+      <li><strong>Ανάθεση βάρους</strong><span><strong>weight = 2</strong> αν η ακμή υπάρχει και από τις δύο πλευρές, αλλιώς <strong>weight = 1</strong>.</span></li>
+      <li><strong>check_graph_consistency</strong><span>Έλεγχος ότι κάθε <code>u→v</code> έχει <code>v→u</code> με ίδιο βάρος.</span></li>
+    </ol>
+
+    <h3>Βήμα 3: CSR Format για KaHIP</h3>
+    <ol class="step-list">
+      <li><strong>to_csr(adj, n)</strong><span>Μετατροπή adjacency list σε CSR format.</span></li>
+      <li><strong>Παραγωγή 4 λιστών</strong><span><code>vwgt</code> (βάρη κορυφών = 1), <code>xadj</code> (offsets), <code>adjncy</code> (flattened γείτονες), <code>adjcwgt</code> (βάρη ακμών).</span></li>
+    </ol>
+
+    <h3>Βήμα 4: KaHIP Partitioning</h3>
+    <pre><span class="fn">kaffpa</span>(
+    vwgt, xadj, adjncy, adjcwgt,
+    m,                    <span class="cm"># αριθμός partitions</span>
+    imbalance,            <span class="cm"># π.χ. 0.03</span>
+    <span class="kw">True</span>,                 <span class="cm"># suppress output</span>
+    seed, kahip_mode
+)
+<span class="cm"># → edgecut, partition vector (labels 0..m-1)</span></pre>
+
+    <h3>Βήμα 5: MLP Training</h3>
+    <ol class="step-list">
+      <li><strong>Προετοιμασία δεδομένων</strong><span><code>X_data = data[:n_nodes]</code>, <code>y_labels = partition</code>. Μετατροπή σε tensors.</span></li>
+      <li><strong>Split 80/20</strong><span>Train/validation split μέσω <code>TensorDataset</code> και <code>Subset</code>.</span></li>
+      <li><strong>DataLoader</strong><span>Batching με <code>batch_size</code> και shuffle για training.</span></li>
+      <li><strong>Device selection</strong><span><code>device = "cuda" if torch.cuda.is_available() else "cpu"</code>.</span></li>
+      <li><strong>Δημιουργία MLPClassifier</strong><span><code>MLPClassifier(d_in, n_out=m, hidden=nodes, layers=layers)</code>.</span></li>
+      <li><strong>Optimizer + Loss</strong><span><code>Adam(model.parameters(), lr=lr)</code> και <code>CrossEntropyLoss()</code>.</span></li>
+      <li><strong>train_model</strong><span>Training loop με forward, backward, step. Validation ανά epoch.</span></li>
+    </ol>
+
+    <h3>Αρχιτεκτονική MLP</h3>
+    <pre>Input(d_in) → Linear(d_in, hidden) → ReLU
+            → (layers-1) × [Linear(hidden, hidden) → ReLU]
+            → Linear(hidden, n_out)  <span class="cm"># χωρίς softmax</span></pre>
+
+    <div class="alert info">
+      <strong>Σημείωση:</strong> Το softmax εφαρμόζεται στο forward pass του search, 
+      όχι στο training, γιατί το <code>CrossEntropyLoss</code> το περιλαμβάνει εσωτερικά.
+    </div>
+
+    <h3>Βήμα 6: Αποθήκευση Index</h3>
+    <ol class="step-list">
+      <li><strong>model.pth</strong><span><code>torch.save({state_dict, input_dim, output_dim, hidden_dim, num_layers}, ...)</code></span></li>
+      <li><strong>partition.npy</strong><span>Partition labels κάθε point.</span></li>
+      <li><strong>inverted_file.npy</strong><span>dict <code>{part_label: [point_ids]}</code>.</span></li>
+    </ol>
+  </div>
+
+  <!-- 3. QUERY -->
+  <div class="section">
+    <h2><span class="num">3</span> Query Phase</h2>
+    <div class="alert warn">
+      <strong>Σημείωση:</strong> Το build <strong>δεν έχει query phase</strong>. 
+      Παράγει μόνο το index και το εκπαιδευμένο μοντέλο, τα οποία 
+      χρησιμοποιούνται αργότερα από το search phase.
+    </div>
+  </div>
+
+  <!-- 4. METRICS -->
+  <div class="section">
+    <h2><span class="num">4</span> Μετρικές (Build)</h2>
+    <p>Κατά τη διάρκεια του build, συλλέγονται οι εξής μετρικές:</p>
+
+    <table>
+      <thead><tr><th>Μετρική</th><th>Περιγραφή</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Edgecut</strong></td><td>Ποιότητα του graph partitioning (μικρότερο = καλύτερο).</td></tr>
+        <tr><td><strong>Partition statistics</strong></td><td>Πλήθος κόμβων ανά partition (ποσοστό).</td></tr>
+        <tr><td><strong>Train Loss / Val Loss</strong></td><td>CrossEntropyLoss ανά epoch.</td></tr>
+        <tr><td><strong>Train Accuracy / Val Accuracy</strong></td><td><code>100 * correct / total</code> ανά epoch.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="alert info">
+      <strong>Σημείωση:</strong> AF, Recall, QPS <strong>δεν</strong> υπολογίζονται στο build — 
+      υπολογίζονται στο search phase.
+    </div>
+  </div>
+
+  <!-- 5. OUTPUT -->
+  <div class="section">
+    <h2><span class="num">5</span> Output (Build)</h2>
+
+    <table>
+      <thead><tr><th>Αρχείο</th><th>Περιεχόμενο</th></tr></thead>
+      <tbody>
+        <tr><td><code>nlsh_build_output.txt</code></td><td>Log όλης της διαδικασίας (stdout redirect).</td></tr>
+        <tr><td><code>knn_output.txt</code></td><td>k-NN graph σε μορφή <code>node: neighbors</code>.</td></tr>
+        <tr><td><code>{index}/model.pth</code></td><td>PyTorch checkpoint με state_dict + dims.</td></tr>
+        <tr><td><code>{index}/partition.npy</code></td><td>Partition labels για κάθε point.</td></tr>
+        <tr><td><code>{index}/inverted_file.npy</code></td><td>dict <code>{part_id: [point_ids]}</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Παράδειγμα log</h3>
+    <div class="result-box">============================================================
+NEURAL LSH BUILD PROCESS STARTED
+============================================================
+>> Loading dataset: sift_data/sift_base.fvecs
+>> Dataset loaded: 70000 vectors, 128 dimensions
+>> Building k-NN graph with IVFFLAT method...
+>> k-NN graph built with 70000 nodes
+>> Making graph undirected and weighted...
+✓ Graph is perfectly symmetric!
+>> Total nodes: 70000
+>> Total edges: 1050000
+>> Running KaHIP...
+   Edgecut = 12345
+   Partition vector size = 70000
+>> Partition statistics:
+   Part 0: 700 nodes (1.00%)
+   ...
+>> Using device: cuda
+>> MLP Model: 12345 parameters
+>> Starting MLP training...
+Epoch 1/10: Train Loss: 2.3456, Train Acc: 45.23%, Val Loss: 2.1234, Val Acc: 48.12%
+...
+>> Saved model to nlsh_index/model.pth
+>> Partition saved to nlsh_index/partition.npy
+>> Inverted file saved to nlsh_index/inverted_file.npy
+============================================================
+NEURAL LSH BUILD PROCESS COMPLETED SUCCESSFULLY
+============================================================</div>
+  </div>
+</section>
+
+<!-- ==================== SEARCH PHASE ==================== -->
+<section class="page" id="search">
+  <div class="phase-header search">
+    <div class="icon">🔍</div>
+    <div>
+      <h1>Search Phase</h1>
+      <p>Αναζήτηση με το εκπαιδευμένο index — <code>nlsh_search2.py</code></p>
+    </div>
+  </div>
+
+  <!-- 1. INPUT -->
+  <div class="section">
+    <h2><span class="num">1</span> Input</h2>
+
+    <table>
+      <thead><tr><th>Παράμετρος</th><th>Περιγραφή</th><th>Default</th></tr></thead>
+      <tbody>
+        <tr><td><code>-d</code></td><td>Dataset βάσης</td><td>—</td></tr>
+        <tr><td><code>-q</code></td><td>Query vectors</td><td>—</td></tr>
+        <tr><td><code>-i</code></td><td>Φάκελος με το αποθηκευμένο index</td><td>—</td></tr>
+        <tr><td><code>-o</code></td><td>Αρχείο αποτελεσμάτων</td><td>—</td></tr>
+        <tr><td><code>-type</code></td><td>"sift" ή "mnist"</td><td>—</td></tr>
+        <tr><td><code>-N</code></td><td>Αριθμός γειτόνων</td><td>1</td></tr>
+        <tr><td><code>-R</code></td><td>Ακτίνα range search</td><td>2000.0</td></tr>
+        <tr><td><code>-T</code></td><td>Αριθμός top bins (multi-probe)</td><td>5</td></tr>
+        <tr><td><code>-range</code></td><td>true/false για range search</td><td>"true"</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Βήματα φόρτωσης</h3>
+    <ol class="step-list">
+      <li><strong>Parse argv</strong><span>Argparse για όλα τα flags.</span></li>
+      <li><strong>Φόρτωση dataset</strong><span><code>load_dataset(dataset, type)</code> → <code>data (n×d)</code>.</span></li>
+      <li><strong>Limit database</strong><span>Αν <code>n > 70000</code>: <code>data = data[:70000]</code> για δίκαιη σύγκριση με Assignment 1.</span></li>
+      <li><strong>Φόρτωση queries</strong><span><code>load_dataset(query_file, type)</code> → <code>queries (Q×d)</code>.</span></li>
+      <li><strong>load_index</strong><span><code>torch.load("model.pth")</code>, δημιουργία MLPClassifier, <code>load_state_dict</code>, <code>eval()</code>. <code>np.load("inverted_file.npy")</code>.</span></li>
+    </ol>
+  </div>
+
+  <!-- 2. BUILD (SKIP) -->
+  <div class="section">
+    <h2><span class="num">2</span> Build Phase (Search)</h2>
+    <div class="alert warn">
+      Το search phase <strong>δεν χτίζει index</strong> — το φορτώνει έτοιμο 
+      από τον δίσκο (αποτέλεσμα του build phase).
+    </div>
+  </div>
+
+  <!-- 3. QUERY -->
+  <div class="section">
+    <h2><span class="num">3</span> Query Phase — Πώς βρίσκεις τους γείτονες</h2>
+
+    <h3>Για κάθε query:</h3>
+
+    <h3>Βήμα 1: MLP Inference</h3>
+    <pre>q_t = torch.tensor(qvec).unsqueeze(0)         <span class="cm"># [1, d]</span>
+<span class="kw">with</span> torch.no_grad():
+    logits = model(q_t)                        <span class="cm"># [1, m]</span>
+    probs = F.softmax(logits, dim=1)           <span class="cm"># [1, m]</span>
+    probs = probs.squeeze(0)                   <span class="cm"># [m]</span></pre>
+
+    <h3>Βήμα 2: Multi-Probe — Επιλογή Top-T Bins</h3>
+    <pre>T = min(args.T, probs.shape[0])
+top_probs, top_bins = torch.topk(probs, T)
+top_bins = top_bins.numpy()</pre>
+
+    <h3>Βήμα 3: Union Candidates</h3>
+    <pre>candidates = set()
+<span class="kw">for</span> b <span class="kw">in</span> top_bins:
+    <span class="kw">if</span> b <span class="kw">in</span> inv_file:
+        candidates.update(inv_file[b])
+candidates = list(candidates)</pre>
+
+    <h3>Βήμα 4: Υπολογισμός Αποστάσεων</h3>
+    <pre>cand_vecs = torch.tensor(data[candidates], dtype=torch.float32)
+q_single = q_t.squeeze(0)
+dists = euclidean_distance(q_single, cand_vecs)    <span class="cm"># [Ncand]</span></pre>
+
+    <h3>Βήμα 5: Range ή Top-N</h3>
+    <pre><span class="kw">if</span> args.do_range_search == <span class="str">"true"</span>:
+    mask = (dists &lt;= R)
+    final_ids = [candidates[i] <span class="kw">for</span> i <span class="kw">in</span> range(len(candidates)) <span class="kw">if</span> mask[i]]
+<span class="kw">else</span>:
+    Nreq = min(args.N, len(candidates))
+    _, top_idx = torch.topk(-dists, Nreq)
+    final_ids = [candidates[i] <span class="kw">for</span> i <span class="kw">in</span> top_idx.numpy()]</pre>
+
+    <h3>Βήμα 6: Exact Search (Brute Force)</h3>
+    <ol class="step-list">
+      <li><strong>Υπολογισμός διαφορών</strong><span><code>diff = data - qvec</code> (broadcasting).</span></li>
+      <li><strong>Τετράγωνα αποστάσεων</strong><span><code>sq = np.sum(diff * diff, axis=1)</code>.</span></li>
+      <li><strong>Top-N</strong><span>Αν <code>N >= len(sq)</code>: <code>argsort</code>; αλλιώς <code>argpartition + sort</code>.</span></li>
+      <li><strong>Τελικές αποστάσεις</strong><span><code>dists = np.sqrt(sq[idx])</code>.</span></li>
+    </ol>
+
+    <div class="alert success">
+      <strong>최적화:</strong> Χρήση <code>np.argpartition</code> αντί για πλήρες sort 
+      όταν <code>N &lt; n</code> — <code>O(n)</code> αντί για <code>O(n log n)</code>.
+    </div>
+  </div>
+
+  <!-- 4. METRICS -->
+  <div class="section">
+    <h2><span class="num">4</span> Μετρικές — AF, Recall, QPS</h2>
+
+    <h3>Recall@N</h3>
+    <pre>true_set = set(true_topN_idx)
+approx_set = set(approx_ids)
+recall = len(true_set.intersection(approx_set)) / float(N)</pre>
+
+    <h3>Average Factor (AF)</h3>
+    <pre>best_true_dist = true_topN_dists[0]
+af_values = []
+<span class="kw">for</span> aid <span class="kw">in</span> approx_ids:
+    dist_a = np.linalg.norm(data[aid] - qvec)     <span class="cm"># true distance</span>
+    af_values.append(dist_a / (best_true_dist + 1e-12))
+avg_af = float(np.mean(af_values))                <span class="cm"># 1.0 αν άδειο</span></pre>
+
+    <h3>QPS (ανά query)</h3>
+    <pre>total_time_for_query = t_approx + t_true
+qps = 1.0 / total_time_for_query</pre>
+
+    <div class="alert info">
+      <strong>Σημείωση:</strong> Το QPS στο Neural LSH <strong>περιλαμβάνει και τον 
+      χρόνο exact search</strong> — διαφορετικό από την Assignment 1.
+    </div>
+
+    <h3>Τελικοί μέσοι όροι</h3>
+    <pre>avg_recall_all = mean([r[<span class="str">"recall"</span>] <span class="kw">for</span> r <span class="kw">in</span> results_per_query])
+avg_af_all     = mean([r[<span class="str">"avg_af"</span>] <span class="kw">for</span> r <span class="kw">in</span> results_per_query])
+avg_qps_all    = mean([r[<span class="str">"qps"</span>] <span class="kw">for</span> r <span class="kw">in</span> results_per_query])
+avg_tapprox    = total_approx_time / Q
+avg_ttrue      = total_true_time / Q</pre>
+  </div>
+
+  <!-- 5. OUTPUT -->
+  <div class="section">
+    <h2><span class="num">5</span> Output — Αρχείο .txt</h2>
+
+    <h3>Ανά query</h3>
+    <div class="result-box">Neural LSH
+Query: 0
+Nearest neighbor-1: 12345
+distanceApproximate: 0.456789
+distanceTrue: 0.432198
+R-near neighbors:
+12345
+23456
+34567
+Average AF: 1.057000
+Recall@N: 1.000000
+QPS: 15.234567
+tApproximateAverage: 0.003905
+tTrueAverage: 0.030277
+
+Query: 1
+...</div>
+
+    <h3>Τελικό block</h3>
+    <div class="result-box">===== TOTAL RESULTS =====
+Total Queries: 10000
+Database Size: 70000
+Average AF (all queries): 2.512631
+Average Recall@1: 0.132700
+Average QPS: 31.023837
+Average tApproximate: 0.003905
+Average tTrue: 0.030277
+=========================</div>
+
+    <h3>Παραδείγματα αρχείων</h3>
+    <p><code>sift_output.txt</code>, <code>mnist_output.txt</code>, <code>output.txt</code></p>
+  </div>
+</section>
+
+<!-- ==================== EXPERIMENTAL STUDY ==================== -->
+<section class="page" id="study">
+  <div class="hero" style="padding-bottom:1.5rem;">
+    <h1>Πειραματική Μελέτη</h1>
+    <p>Επιλογή υπερπαραμέτρων και σύγκριση με την 1η εργασία</p>
+  </div>
+
+  <!-- HYPEPARAMETERS -->
+  <div class="section">
+    <h2>🎛️ Επιλογή Υπερπαραμέτρων</h2>
+    <p>
+      Ως <strong>βασικό σημείο αναφοράς</strong> (Συνδυασμός 1) ορίστηκαν οι 
+      προεπιλογές της εκφώνησης:
+    </p>
+    <div class="result-box">knn = 10, m = 100, imbalance = 0.03, kahip_mode = 2 (STRONG)
+layers = 3, nodes = 64, epochs = 10, batch_size = 128, lr = 0.001, seed = 1</div>
+
+    <p>Στη συνέχεια, τροποποιήθηκαν επιλεκτικά ομάδες παραμέτρων:</p>
+    <ol class="step-list">
+      <li><strong>Επέκταση m & imbalance</strong><span>Λεπτότερη διαμέριση (μεγαλύτερο m) → μικρότερα υποσύνολα υποψηφίων. Επίδραση της ανισορροπίας στην ποιότητα KaHIP.</span></li>
+      <li><strong>Αύξηση knn & nodes</strong><span>Πυκνότερος k-NN γράφος → καλύτερη δομή διαμέρισης. Μεγαλύτερο MLP → καλύτερη αντιστοίχιση.</span></li>
+      <li><strong>Epochs & lr</strong><span>Περισσότερα epochs + συντηρητικό lr → καλύτερη σύγκλιση και ακρίβεια.</span></li>
+    </ol>
+  </div>
+
+  <!-- MODEL PARAMS -->
+  <div class="section">
+    <h2>📋 Παράμετροι Μοντέλου</h2>
+    <div class="exp-table-wrap">
+      <table class="exp-table">
+        <thead>
+          <tr>
+            <th>#</th><th>knn</th><th>m</th><th>imbalance</th><th>layers</th>
+            <th>nodes</th><th>epochs</th><th>batch_size</th><th>lr</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>10</td><td>100</td><td>0.03</td><td>3</td><td>64</td><td>10</td><td>128</td><td>0.001</td></tr>
+          <tr><td>2</td><td>10</td><td>200</td><td>0.05</td><td>3</td><td>64</td><td>20</td><td>128</td><td>0.001</td></tr>
+          <tr><td>3</td><td>20</td><td>100</td><td>0.03</td><td>3</td><td>128</td><td>10</td><td>256</td><td>0.001</td></tr>
+          <tr><td>4</td><td>20</td><td>200</td><td>0.05</td><td>3</td><td>128</td><td>20</td><td>256</td><td>0.0005</td></tr>
+          <tr><td>5</td><td>40</td><td>100</td><td>0.03</td><td>3</td><td>256</td><td>10</td><td>128</td><td>0.0005</td></tr>
+          <tr><td>6</td><td>40</td><td>200</td><td>0.05</td><td>3</td><td>256</td><td>20</td><td>256</td><td>0.001</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TEST PARAMS -->
+  <div class="section">
+    <h2>🧪 Παράμετροι Δοκιμών</h2>
+
+    <h3>SIFT</h3>
+    <table>
+      <thead><tr><th>#</th><th>N</th><th>R</th><th>T</th><th>range</th></tr></thead>
+      <tbody>
+        <tr><td>α</td><td>1</td><td>2.8005</td><td>5</td><td>true</td></tr>
+        <tr><td>β</td><td>1</td><td>2.8005</td><td>5</td><td>false</td></tr>
+        <tr><td>γ</td><td>1</td><td>2.800</td><td>10</td><td>true</td></tr>
+        <tr><td>δ</td><td>1</td><td>3.000</td><td>10</td><td>true</td></tr>
+      </tbody>
+    </table>
+
+    <h3>MNIST</h3>
+    <table>
+      <thead><tr><th>#</th><th>N</th><th>R</th><th>T</th><th>range</th></tr></thead>
+      <tbody>
+        <tr><td>α</td><td>1</td><td>2.000</td><td>5</td><td>true</td></tr>
+        <tr><td>β</td><td>1</td><td>2.800</td><td>5</td><td>false</td></tr>
+        <tr><td>γ</td><td>1</td><td>2.000</td><td>10</td><td>true</td></tr>
+        <tr><td>δ</td><td>1</td><td>2.800</td><td>10</td><td>true</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- RESULTS SIFT -->
+  <div class="section">
+    <h2>📊 Αποτελέσματα — SIFT</h2>
+
+    <div class="exp-table-wrap">
+      <table class="exp-table">
+        <thead>
+          <tr>
+            <th>Number</th><th>AF</th><th>Recall@1</th><th>QPS</th>
+            <th>tApprox</th><th>tTrue</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1α</td><td>2.512631</td><td>0.132700</td><td>31.024</td><td>0.003905</td><td>0.030277</td></tr>
+          <tr><td>1β</td><td><strong style="color:var(--success)">1.109939</strong></td><td>0.139300</td><td>30.770</td><td>0.003667</td><td>0.029700</td></tr>
+          <tr><td>1γ</td><td>2.531367</td><td><strong style="color:var(--success)">0.241900</strong></td><td>24.295</td><td>0.006871</td><td>0.036826</td></tr>
+          <tr><td>2α</td><td>2.491166</td><td>0.094500</td><td>29.404</td><td>0.002520</td><td>0.033060</td></tr>
+          <tr><td>3α</td><td>2.527624</td><td>0.156200</td><td>30.918</td><td>0.004477</td><td>0.031420</td></tr>
+          <tr><td>4α</td><td>2.511254</td><td>0.105900</td><td><strong style="color:var(--success)">38.347</strong></td><td>0.001921</td><td>0.025070</td></tr>
+          <tr><td>5α</td><td>2.543745</td><td>0.164100</td><td>35.768</td><td>0.003032</td><td>0.026198</td></tr>
+          <tr><td>6α</td><td>2.530496</td><td>0.109600</td><td>33.066</td><td>0.002361</td><td>0.029867</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Recall@1 ανά Συνδυασμό (SIFT)</h3>
+    <div class="chart">
+      <div class="chart-bar">
+        <span class="value">0.133</span>
+        <div class="bar blue" style="height:13%"></div>
+        <span class="label">1α</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.139</span>
+        <div class="bar blue" style="height:14%"></div>
+        <span class="label">1β</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.242</span>
+        <div class="bar green" style="height:24%"></div>
+        <span class="label">1γ</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.156</span>
+        <div class="bar amber" style="height:16%"></div>
+        <span class="label">3α</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.164</span>
+        <div class="bar purple" style="height:16%"></div>
+        <span class="label">5α</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS MNIST -->
+  <div class="section">
+    <h2>📊 Αποτελέσματα — MNIST</h2>
+
+    <div class="exp-table-wrap">
+      <table class="exp-table">
+        <thead>
+          <tr>
+            <th>Number</th><th>AF</th><th>Recall@1</th><th>QPS</th>
+            <th>tApprox</th><th>tTrue</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1α</td><td>2.697205</td><td>0.105900</td><td>9.226</td><td>0.009006</td><td>0.104608</td></tr>
+          <tr><td>1β</td><td><strong style="color:var(--success)">1.171726</strong></td><td>0.105900</td><td>6.616</td><td>0.010186</td><td>0.147680</td></tr>
+          <tr><td>1γ</td><td>2.700603</td><td>0.194000</td><td>7.808</td><td>0.019969</td><td>0.116700</td></tr>
+          <tr><td>3α</td><td>2.700090</td><td>0.118100</td><td>9.436</td><td>0.165747</td><td>0.101834</td></tr>
+          <tr><td>5α</td><td>2.699317</td><td><strong style="color:var(--success)">0.130100</strong></td><td>7.444</td><td>0.009414</td><td>0.133722</td></tr>
+          <tr><td>5γ</td><td>2.702049</td><td><strong style="color:var(--success)">0.221600</strong></td><td>7.555</td><td>0.015926</td><td>0.123433</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Recall@1 ανά Συνδυασμό (MNIST)</h3>
+    <div class="chart">
+      <div class="chart-bar">
+        <span class="value">0.106</span>
+        <div class="bar blue" style="height:11%"></div>
+        <span class="label">1α</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.194</span>
+        <div class="bar green" style="height:19%"></div>
+        <span class="label">1γ</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.118</span>
+        <div class="bar amber" style="height:12%"></div>
+        <span class="label">3α</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.130</span>
+        <div class="bar purple" style="height:13%"></div>
+        <span class="label">5α</span>
+      </div>
+      <div class="chart-bar">
+        <span class="value">0.222</span>
+        <div class="bar red" style="height:22%"></div>
+        <span class="label">5γ</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARISON -->
+  <div class="section">
+    <h2>⚖️ Σύγκριση 1ης και 2ης Εργασίας</h2>
+
+    <div class="exp-table-wrap">
+      <table class="exp-table">
+        <thead>
+          <tr>
+            <th>Μέθοδος</th><th>Recall@N</th><th>QPS</th><th>AF</th>
+            <th>tApprox</th><th>tTrue</th><th>Dataset</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Neural LSH</strong></td><td>0.07-0.26</td><td>6-38</td><td>1.10-2.70</td><td>0.0022-0.16</td><td>0.025-0.57</td><td>70K</td></tr>
+          <tr><td>LSH</td><td>0.68-1</td><td>0.28-9.41</td><td>1.01</td><td>0.02-2.1</td><td>0.08-0.32</td><td>70K</td></tr>
+          <tr><td>Hypercube</td><td>0.006-0.25</td><td>1.5-91</td><td>1.10-1.314</td><td>0.0009-0.65</td><td>0.10-0.66</td><td>70K</td></tr>
+          <tr><td>IVFPQ</td><td>0.36-0.47</td><td>1.25-78.3</td><td>3.25-3.79</td><td>0.0018-0.01</td><td>0.010-0.787</td><td>70K</td></tr>
+          <tr><td><strong>IVFFlat</strong></td><td><strong style="color:var(--success)">0.95-0.98</strong></td><td>2.21-82.7</td><td><strong style="color:var(--success)">0.064-0.51</strong></td><td>0.001-0.07</td><td>0.01-0.377</td><td>70K</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Ανάλυση ανά Μετρική</h3>
+
+    <h3>🎯 Ακρίβεια (Recall@N)</h3>
+    <p>Η 1η εργασία υπερέχει ξεκάθαρα:</p>
+    <ul style="color:var(--text-muted); margin-left:1.5rem; margin-top:0.5rem;">
+      <li><strong>IVFFlat</strong>: 0.99 στο MNIST, 0.97 στο SIFT</li>
+      <li><strong>Neural LSH</strong>: μέγιστο 0.26 στο SIFT, 0.22 στο MNIST</li>
+    </ul>
+
+    <h3>📏 Ποιότητα Προσέγγισης (AF)</h3>
+    <ul style="color:var(--text-muted); margin-left:1.5rem;">
+      <li>IVFFlat: 0.06-0.5 (εξαιρετικό)</li>
+      <li>LSH/Hypercube: 1.1-1.3 (καλό)</li>
+      <li>Neural LSH: ~2.5 (εκτός από παραλλαγές β = 1.10-1.17)</li>
+    </ul>
+
+    <h3>⚡ Ταχύτητα (QPS)</h3>
+    <ul style="color:var(--text-muted); margin-left:1.5rem;">
+      <li><strong>SIFT</strong>: Neural LSH = 24-38 QPS — ανταγωνιστικό με IVFFlat/Hypercube</li>
+      <li><strong>MNIST</strong>: Neural LSH = 6-9 QPS — ταχύτερο από LSH/Hypercube</li>
+    </ul>
+
+    <h3>⏱️ Χρόνος Αναζήτησης</h3>
+    <ul style="color:var(--text-muted); margin-left:1.5rem;">
+      <li>Neural LSH: 0.002-0.02s (πολύ χαμηλός)</li>
+      <li>Στο SIFT: συγκρίσιμο ή ελαφρώς ταχύτερο από IVFFlat</li>
+    </ul>
+
+    <div class="alert success">
+      <strong>Συνολικό συμπέρασμα:</strong> Η 1η εργασία υπερέχει σε ακρίβεια (χάρη 
+      κυρίως στο IVFFlat). Το Neural LSH, παρότι υστερεί σε Recall και AF, προσφέρει 
+      <strong>σταθερή και ταχεία αναζήτηση</strong> με πολύ χαμηλούς χρόνους ανά 
+      ερώτημα. Καμία παραλλαγή δεν πλησίασε την απόδοση του IVFFlat, ο οποίος 
+      παραμένει η πιο αποτελεσματική μέθοδος ανάκτησης.
+    </div>
+  </div>
+
+  <!-- CONCLUSIONS -->
+  <div class="section">
+    <h2>🏁 Key Findings</h2>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="value">0.24</span>
+        <span class="name">Best Recall (SIFT 1γ)</span>
+      </div>
+      <div class="stat">
+        <span class="value">38</span>
+        <span class="name">Best QPS (SIFT 4α)</span>
+      </div>
+      <div class="stat">
+        <span class="value">1.10</span>
+        <span class="name">Best AF (1β/2β)</span>
+      </div>
+      <div class="stat">
+        <span class="value">0.002</span>
+        <span class="name">Min tApprox (s)</span>
+      </div>
+    </div>
+
+    <h3>Παρατηρήσεις</h3>
+    <ol class="step-list">
+      <li><strong>Το imbalance=0.03 δίνει καλύτερο AF</strong><span>Οι παραλλαγές β έχουν AF ~1.10 έναντι ~2.5 των άλλων.</span></li>
+      <li><strong>Το μεγαλύτερο T βελτιώνει το Recall</strong><span>Οι παραλλαγές γ (T=10) έχουν σχεδόν διπλάσιο Recall από τις α (T=5).</span></li>
+      <li><strong>Το πυκνότερο k-NN graph βοηθά</strong><span>knn=40 (συνδυασμός 5) δίνει καλύτερο Recall από knn=10.</span></li>
+      <li><strong>Το Neural LSH δεν φτάνει το IVFFlat</strong><span>Το partitioning χάνει ποιότητα έναντι του k-means clustering.</span></li>
+      <li><strong>Πολύ χαμηλοί χρόνοι αναζήτησης</strong><span>tApprox = 0.002-0.02s — ταχύτερο από LSH/Hypercube στο MNIST.</span></li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Εργασία · Ανάπτυξη Λογισμικού για Αλγοριθμικά Προβλήματα · ΕΚΠΑ<br>
+  <span style="opacity:0.6;">© 2025 — Παπαθανασίου Ελένη · Τόντου Αλτάνη-Δάφνη</span>
+</footer>
+
+<script>
+function go(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+  
+  const target = document.getElementById(page);
+  if (target) target.classList.add('active');
+  
+  const link = document.querySelector(`.nav-links a[data-page="${page}"]`);
+  if (link) link.classList.add('active');
+  
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  history.replaceState(null, '', '#' + page);
+}
+
+window.addEventListener('load', () => {
+  const hash = window.location.hash.slice(1) || 'home';
+  go(hash);
+});
+
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash.slice(1) || 'home';
+  go(hash);
+});
+</script>
+</body>
+</html>
